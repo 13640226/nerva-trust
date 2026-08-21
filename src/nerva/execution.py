@@ -156,7 +156,7 @@ class Executor:
                 request_id=context.request_id,
             ) from exc
 
-        except TimeoutError as exc:
+        except (TimeoutError, asyncio.TimeoutError) as exc:
             raise NervaError(
                 "EXECUTION_TIMEOUT",
                 request_id=context.request_id,
@@ -273,3 +273,5 @@ class Executor:
             awaitable,
             timeout=timeout_seconds,
         )
+
+
