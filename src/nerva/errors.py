@@ -1,6 +1,3 @@
-from __future__ import annotations
-
-
 ERROR_CATALOG: dict[str, dict[str, object]] = {
     "EXECUTION_TIMEOUT": {
         "category": "deadline_exceeded",
@@ -99,17 +96,13 @@ ERROR_CATALOG: dict[str, dict[str, object]] = {
     },
     "SERIALIZATION_FAILED": {
         "category": "invalid_argument",
-        "default_message": (
-            "The serialization or deserialization process failed."
-        ),
+        "default_message": "The serialization or deserialization process failed.",
         "retryable": False,
     },
 }
 
 
 class NervaError(Exception):
-    """Canonical transport-neutral Nerva error."""
-
     def __init__(
         self,
         code: str,
@@ -147,7 +140,6 @@ class NervaError(Exception):
         self.cause_code = cause_code
 
     def to_dict(self) -> dict[str, object]:
-        """Return the canonical error object without an outer envelope."""
         return {
             "code": self.code,
             "category": self.category,
