@@ -19,12 +19,10 @@ FORBIDDEN_METADATA_KEYS = {
 
 
 def _is_forbidden_key(key: str) -> bool:
-    """Return True if metadata key is credential-bearing."""
     return key.lower() in FORBIDDEN_METADATA_KEYS
 
 
 def _contains_forbidden_key(obj: Any) -> tuple[bool, str]:
-    """Recursively search metadata containers for forbidden keys."""
     if isinstance(obj, Mapping):
         for key, value in obj.items():
             key_text = str(key)
@@ -46,7 +44,6 @@ def _contains_forbidden_key(obj: Any) -> tuple[bool, str]:
 
 
 def _deep_freeze(obj: Any) -> Any:
-    """Recursively convert mutable containers to immutable equivalents."""
     if isinstance(obj, Mapping):
         frozen = {
             str(key): _deep_freeze(value)
@@ -61,7 +58,6 @@ def _deep_freeze(obj: Any) -> Any:
 
 
 def _deep_thaw(value: Any) -> Any:
-    """Recursively convert internal immutable values to plain wire values."""
     if isinstance(value, Mapping):
         return {
             str(key): _deep_thaw(item)
@@ -76,12 +72,6 @@ def _deep_thaw(value: Any) -> Any:
 
 @dataclass(frozen=True, init=False)
 class ExecContext:
-    """
-    Immutable Nerva execution context.
-
-    Implements R-CTX-001 through R-CTX-010.
-    """
-
     request_id: str
     user_id: str
     session_id: str | None
@@ -155,7 +145,6 @@ class ExecContext:
         request_id: str,
         user_id: str,
     ) -> None:
-        """Validate required non-empty string identifiers."""
         if not isinstance(request_id, str) or not request_id:
             raise NervaError(
                 "SCHEMA_VALIDATION_FAILED",
@@ -176,7 +165,6 @@ class ExecContext:
         session_id: str | None,
         trace_id: str | None,
     ) -> None:
-        """Validate optional string identifiers."""
         if session_id is not None and not isinstance(session_id, str):
             raise NervaError(
                 "SCHEMA_VALIDATION_FAILED",
@@ -197,7 +185,6 @@ class ExecContext:
         timeout_ms: int | None,
         deadline_unix_ms: int | None,
     ) -> None:
-        """Validate positive integer timing values and reject bool."""
         if timeout_ms is not None:
             if type(timeout_ms) is not int or timeout_ms <= 0:
                 raise NervaError(
@@ -216,7 +203,6 @@ class ExecContext:
 
     @staticmethod
     def _validate_version(version: str) -> None:
-        """Validate ExecContext protocol version."""
         if not isinstance(version, str):
             raise NervaError(
                 "SCHEMA_VALIDATION_FAILED",
@@ -235,7 +221,6 @@ class ExecContext:
     def _validate_capabilities(
         capabilities: list[str] | None,
     ) -> list[str]:
-        """Validate capabilities as list[str]."""
         if capabilities is None:
             return []
 
@@ -259,7 +244,6 @@ class ExecContext:
     def _validate_metadata(
         metadata: dict[str, Any] | None,
     ) -> dict[str, Any]:
-        """Validate metadata and reject credential-bearing material."""
         if metadata is None:
             return {}
 
@@ -287,11 +271,6 @@ class ExecContext:
         return metadata
 
     def to_dict(self) -> dict[str, Any]:
-        """
-        Serialize ExecContext to its allow-listed plain wire representation.
-
-        Implements R-CTX-007 and R-CTX-010.
-        """
         return {
             "version": self.version,
             "request_id": self.request_id,
@@ -308,12 +287,7 @@ class ExecContext:
     def from_dict(
         cls,
         data: dict[str, Any],
-    ) -> "ExecContext":
-        """
-        Deserialize ExecContext from its wire representation.
-
-        Unknown fields are rejected according to R-CTX-008.
-        """
+    ) -> ExecContext:
         allowed_fields = {
             "version",
             "request_id",
