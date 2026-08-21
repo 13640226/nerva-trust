@@ -46,10 +46,7 @@ def _contains_forbidden_key(obj: Any) -> tuple[bool, str]:
 
 def _deep_freeze(obj: Any) -> Any:
     if isinstance(obj, Mapping):
-        frozen = {
-            str(key): _deep_freeze(value)
-            for key, value in obj.items()
-        }
+        frozen = {str(key): _deep_freeze(value) for key, value in obj.items()}
         return MappingProxyType(frozen)
 
     if isinstance(obj, (list, tuple)):
@@ -60,10 +57,7 @@ def _deep_freeze(obj: Any) -> Any:
 
 def _deep_thaw(value: Any) -> Any:
     if isinstance(value, Mapping):
-        return {
-            str(key): _deep_thaw(item)
-            for key, item in value.items()
-        }
+        return {str(key): _deep_thaw(item) for key, item in value.items()}
 
     if isinstance(value, tuple):
         return [_deep_thaw(item) for item in value]
@@ -186,9 +180,7 @@ class ExecContext:
         timeout_ms: int | None,
         deadline_unix_ms: int | None,
     ) -> None:
-        if timeout_ms is not None and (
-            type(timeout_ms) is not int or timeout_ms <= 0
-        ):
+        if timeout_ms is not None and (type(timeout_ms) is not int or timeout_ms <= 0):
             raise NervaError(
                 "SCHEMA_VALIDATION_FAILED",
                 message="timeout_ms must be a positive integer",
@@ -262,10 +254,7 @@ class ExecContext:
         if forbidden_found:
             raise NervaError(
                 "SCHEMA_VALIDATION_FAILED",
-                message=(
-                    "Credential-bearing fields are forbidden "
-                    "in ExecContext metadata"
-                ),
+                message=("Credential-bearing fields are forbidden in ExecContext metadata"),
                 details={"field": forbidden_key},
             )
 

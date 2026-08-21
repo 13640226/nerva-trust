@@ -1,9 +1,7 @@
 ERROR_CATALOG: dict[str, dict[str, object]] = {
     "EXECUTION_TIMEOUT": {
         "category": "deadline_exceeded",
-        "default_message": (
-            "The operation exceeded its permitted execution deadline or timeout."
-        ),
+        "default_message": ("The operation exceeded its permitted execution deadline or timeout."),
         "retryable": True,
     },
     "CANCELLED": {
@@ -25,9 +23,7 @@ ERROR_CATALOG: dict[str, dict[str, object]] = {
     },
     "PERMISSION_DENIED": {
         "category": "authorization",
-        "default_message": (
-            "The requested operation is not permitted by the active policy."
-        ),
+        "default_message": ("The requested operation is not permitted by the active policy."),
         "retryable": False,
     },
     "RATE_LIMIT_EXCEEDED": {
@@ -57,9 +53,7 @@ ERROR_CATALOG: dict[str, dict[str, object]] = {
     },
     "SCHEMA_VALIDATION_FAILED": {
         "category": "invalid_argument",
-        "default_message": (
-            "Input or output did not satisfy the declared schema contract."
-        ),
+        "default_message": ("Input or output did not satisfy the declared schema contract."),
         "retryable": False,
     },
     "NOT_FOUND": {
@@ -89,9 +83,7 @@ ERROR_CATALOG: dict[str, dict[str, object]] = {
     },
     "CAPABILITY_UNSUPPORTED": {
         "category": "invalid_argument",
-        "default_message": (
-            "The requested capability is not supported by this implementation."
-        ),
+        "default_message": ("The requested capability is not supported by this implementation."),
         "retryable": False,
     },
     "SERIALIZATION_FAILED": {
@@ -122,11 +114,7 @@ class NervaError(Exception):
             resolved_message = message or code
         else:
             resolved_category = category or str(entry["category"])
-            resolved_retryable = (
-                bool(entry["retryable"])
-                if retryable is None
-                else retryable
-            )
+            resolved_retryable = bool(entry["retryable"]) if retryable is None else retryable
             resolved_message = message or str(entry["default_message"])
 
         super().__init__(resolved_message)
