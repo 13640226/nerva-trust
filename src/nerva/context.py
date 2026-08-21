@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any
 
 from .errors import NervaError
 
@@ -185,21 +186,23 @@ class ExecContext:
         timeout_ms: int | None,
         deadline_unix_ms: int | None,
     ) -> None:
-        if timeout_ms is not None:
-            if type(timeout_ms) is not int or timeout_ms <= 0:
-                raise NervaError(
-                    "SCHEMA_VALIDATION_FAILED",
-                    message="timeout_ms must be a positive integer",
-                    details={"field": "timeout_ms"},
-                )
+        if timeout_ms is not None and (
+            type(timeout_ms) is not int or timeout_ms <= 0
+        ):
+            raise NervaError(
+                "SCHEMA_VALIDATION_FAILED",
+                message="timeout_ms must be a positive integer",
+                details={"field": "timeout_ms"},
+            )
 
-        if deadline_unix_ms is not None:
-            if type(deadline_unix_ms) is not int or deadline_unix_ms <= 0:
-                raise NervaError(
-                    "SCHEMA_VALIDATION_FAILED",
-                    message="deadline_unix_ms must be a positive integer",
-                    details={"field": "deadline_unix_ms"},
-                )
+        if deadline_unix_ms is not None and (
+            type(deadline_unix_ms) is not int or deadline_unix_ms <= 0
+        ):
+            raise NervaError(
+                "SCHEMA_VALIDATION_FAILED",
+                message="deadline_unix_ms must be a positive integer",
+                details={"field": "deadline_unix_ms"},
+            )
 
     @staticmethod
     def _validate_version(version: str) -> None:
@@ -254,9 +257,7 @@ class ExecContext:
                 details={"field": "metadata"},
             )
 
-        forbidden_found, forbidden_key = _contains_forbidden_key(
-            metadata
-        )
+        forbidden_found, forbidden_key = _contains_forbidden_key(metadata)
 
         if forbidden_found:
             raise NervaError(
