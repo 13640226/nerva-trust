@@ -6,10 +6,10 @@ from collections.abc import Awaitable
 from typing import Any
 
 import pytest
-from nerva.execution import CapabilityHandler, ExecutionResult, Executor
 
 from nerva.context import ExecContext
 from nerva.errors import NervaError
+from nerva.execution import CapabilityHandler, ExecutionResult, Executor
 from nerva.policy import Policy, Rule
 from nerva.registry import Registry
 
