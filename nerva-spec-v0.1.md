@@ -1136,6 +1136,7 @@ CapabilityCallable = Callable[
     Awaitable[Any],
 ]
 
+
 @dataclass(frozen=True)
 class CapabilityHandler:
     version: str
