@@ -273,5 +273,3 @@ class Executor:
             awaitable,
             timeout=timeout_seconds,
         )
-
-
