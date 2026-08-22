@@ -1674,4 +1674,164 @@ Transport neutrality and state-boundary requirements are part of Layer 3 conform
 
 Violation of these requirements constitutes a Layer 3 conformance failure.
 
+## 19. Layer 4 - Observability
+
+**Status:** SPEC FROZEN / IMPLEMENTATION PENDING
+**Revision Type:** EXPLICIT SEMANTIC REVISION
+**Depends On:** Layer 0 (ExecContext, NervaError), Layer 2 (Capability Invocation & Execution), Layer 3 (Workflow Orchestration)
+
+Layer 4 defines transport-neutral observability for capability and workflow execution.
+
+Layer 4 MUST NOT alter the canonical execution semantics of Layers 0 through 3.
+
+Observability data MUST be derived from already-observable execution state and MUST NOT become an input to execution, policy evaluation, registry lookup, scheduling, cancellation, retry, or error selection.
+
+Layer 4 MUST remain optional with respect to execution correctness: failure of an observability sink MUST NOT change a successful or failed execution result.
+
+##### R-OBS-001 - Observation Model
+
+Layer 4 SHALL define an immutable observation record representing one observable execution event.
+
+An observation record MUST contain:
+
+- `event_id`: a canonical UUID string generated once for the observation;
+- `event_type`: a stable Layer 4 event identifier;
+- `timestamp_unix_ms`: a non-negative Unix timestamp in milliseconds representing when the observation was created;
+- `request_id`: the originating `ExecContext.request_id`;
+- `workflow_id`: when the observation belongs to a Layer 3 workflow invocation;
+- `step_id`: when the observation belongs to a workflow step;
+- `capability_id`: when the observation belongs to a Layer 2 capability invocation;
+- `attributes`: an immutable mapping of additional observation metadata.
+
+Fields not applicable to an event MUST be absent or `None` according to the canonical Layer 4 data model.
+
+##### R-OBS-002 - Event Identifier Semantics
+
+`event_id` MUST uniquely identify one observation record.
+
+An implementation MUST NOT reuse an `event_id` for another observation.
+
+Event identifiers MUST NOT encode transport-specific routing information, process identifiers, filesystem paths, hostnames, or network addresses.
+
+##### R-OBS-003 - Event Type Catalog
+
+Layer 4 SHALL define a closed canonical event-type catalog for this specification revision.
+
+The canonical catalog MUST include events for:
+
+- capability invocation started;
+- capability invocation completed;
+- capability invocation failed;
+- workflow invocation started;
+- workflow step started;
+- workflow step completed;
+- workflow step failed;
+- workflow cancellation requested;
+- workflow invocation completed;
+- workflow invocation failed.
+
+An implementation MUST NOT introduce additional canonical Layer 4 event types without an Explicit Semantic Revision.
+
+Implementation-specific non-canonical diagnostic events MAY exist outside the canonical Layer 4 conformance surface.
+
+##### R-OBS-004 - Correlation
+
+Observations MUST preserve available canonical correlation identifiers from the execution being observed.
+
+Layer 4 MUST NOT generate replacement `request_id`, `workflow_id`, `step_id`, `session_id`, or `trace_id` values when those identifiers already exist.
+
+Layer 4 MUST NOT mutate the supplied `ExecContext` for correlation purposes.
+
+##### R-OBS-005 - Causal Ordering
+
+For observations emitted by one logical execution path, an implementation MUST preserve program-order causality.
+
+A completion or failure observation MUST NOT be emitted before the corresponding start observation.
+
+Layer 4 does not define a total ordering across independently executing workflow steps.
+
+Concurrent observations MAY be delivered in any order consistent with the causal constraints above.
+
+##### R-OBS-006 - Result and Error Representation
+
+Successful observations MAY include non-sensitive summary metadata about the corresponding execution result.
+
+Layer 4 MUST NOT require deep serialization of opaque Layer 2 output values.
+
+Failure observations MUST reference the canonical `NervaError` produced by the underlying layer or a transport-neutral representation of that error.
+
+Layer 4 MUST NOT wrap, replace, reclassify, or semantically transform a canonical `NervaError`.
+
+##### R-OBS-007 - Sensitive Data Boundaries
+
+Observation records MUST NOT contain credentials, secrets, authentication tokens, or raw secret-bearing capability inputs.
+
+Implementations MUST provide a deterministic redaction boundary before observations are delivered to an external sink.
+
+Redaction MUST NOT mutate the underlying `ExecContext`, capability input, execution result, `WorkflowResult`, or `NervaError`.
+
+##### R-OBS-008 - Observer Interface
+
+The canonical Layer 4 observer surface is logically equivalent to:
+
+```python
+class Observer:
+    async def emit(
+        self,
+        observation: Observation,
+    ) -> None:
+        ...
+```
+
+An observer MUST receive an immutable observation record.
+
+The execution layers MUST NOT depend on observer return values.
+
+An observer MUST NOT be given authority to mutate execution state.
+
+##### R-OBS-009 - Failure Isolation
+
+Failure of an observer or observability sink MUST NOT change the canonical result of the execution being observed.
+
+Observer exceptions MUST NOT replace a successful `ExecutionResult`, `WorkflowResult`, or canonical `NervaError`.
+
+An implementation MAY record observer failures through a non-canonical local diagnostic mechanism.
+
+Layer 4 MUST NOT introduce a new canonical execution error code solely for observability delivery failure.
+
+##### R-OBS-010 - Non-Blocking Execution Boundary
+
+Layer 4 MUST NOT require durable delivery, distributed consensus, or remote acknowledgement before canonical execution may complete.
+
+An implementation MAY buffer, batch, or asynchronously deliver observations.
+
+Any buffering mechanism MUST remain outside the canonical execution state of Layer 3.
+
+Loss of buffered observations after canonical execution completion MUST NOT retroactively alter that execution result.
+
+##### R-OBS-011 - Transport Neutrality
+
+Layer 4 MUST NOT define a required wire format or transport binding for observations.
+
+The canonical Layer 4 model MUST NOT depend on HTTP, gRPC, WebSocket, RPC, message queues, OpenTelemetry exporters, files, databases, or another transport mechanism.
+
+Adapters MAY map canonical observations to external observability systems provided that the mapping does not alter Layer 4 semantics.
+
+##### R-OBS-012 - State and Execution Boundaries
+
+Layer 4 MUST remain observational.
+
+Layer 4 MUST NOT:
+
+- perform Registry lookup or Policy enforcement;
+- invoke capabilities;
+- start, cancel, retry, or reschedule workflow steps;
+- mutate `ExecContext`;
+- mutate `ExecutionResult`, `WorkflowResult`, or `NervaError`;
+- persist canonical workflow execution state;
+- introduce checkpointing or recovery semantics;
+- introduce new canonical execution error codes.
+
+Violation of these requirements constitutes a Layer 4 conformance failure.
+
 # End of Nerva Specification v0.1
