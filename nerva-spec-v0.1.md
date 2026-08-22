@@ -1,305 +1,278 @@
-## 18. Layer 3 — Workflow Orchestration
+$ErrorActionPreference = "Stop"
 
-**Status:** SPEC FROZEN / IMPLEMENTATION PENDING
-**Revision Type:** EXPLICIT SEMANTIC REVISION
-**Depends On:** Layer 0 (ExecContext, NervaError), Layer 2 (Capability Invocation & Execution)
+Set-Location C:\Users\hamid\Desktop\nerva-trust
 
-Layer 3 defines transport-neutral orchestration of multiple capability invocations as an acyclic dependency graph.
+$path = ".\nerva-spec-v0.1.md"
+$backup = ".\nerva-spec-v0.1.md.before-layer3-conformant.bak"
 
-Layer 3 MUST remain stateless.
+if (-not (Test-Path -LiteralPath $path)) {
+    throw "Specification file not found: $path"
+}
 
-Layer 3 MUST NOT define:
+git status --short
 
-- transport bindings;
-- persistence or checkpointing;
-- distributed scheduling;
-- capability discovery;
-- observability;
-- loops;
-- conditional branching;
-- automatic retry;
-- fallback;
-- compensation;
-- inter-step data binding;
-- new canonical error codes.
+if ($LASTEXITCODE -ne 0) {
+    throw "git status failed."
+}
 
-### 18.1 Canonical Data Model
+Copy-Item -LiteralPath $path -Destination $backup -Force
 
-#### R-WORKFLOW-001 — Workflow Definition
-
-A workflow SHALL be represented as an immutable container of workflow steps.
-
-The canonical stored logical model is:
-
-```python
-@dataclass(frozen=True)
-class Workflow:
-    steps: tuple[WorkflowStep, ...]
-
-The following requirements apply:
-
-steps MUST be a tuple in the canonical stored representation.
-steps MUST contain only WorkflowStep instances.
-steps MUST NOT be empty.
-Tuple position MUST NOT by itself imply execution order.
-Execution readiness and ordering MUST be determined only by the dependency graph defined by depends_on.
-Forward references are permitted; a dependency MAY refer to a step appearing later in the steps tuple.
-The Workflow object MUST be immutable after successful construction.
-Workflow-wide structural validation, including identifier uniqueness, dependency resolution, and acyclicity, MUST complete before the Workflow is considered successfully constructed.
-Violation of this requirement MUST raise INVALID_INPUT.
-R-WORKFLOW-002 — Workflow Step Validation
-
-Each workflow step SHALL have the canonical stored logical representation:
-
-@dataclass(frozen=True)
-class WorkflowStep:
-    id: str
-    capability: str
-    args: Mapping[str, Any]
-    depends_on: tuple[str, ...] = ()
-
-At WorkflowStep construction:
-
-id MUST be a non-empty string.
-capability MUST be a non-empty string.
-args MAY be supplied as None, in which case it MUST be normalized to an empty immutable mapping.
-Otherwise, args MUST be a Mapping whose keys are strings.
-The top-level stored args mapping MUST be immutable.
-Construction MUST isolate the stored top-level mapping from subsequent mutation of the caller-supplied mapping.
-Nested values contained within args are opaque to Layer 3 and are NOT required to be deep-frozen in this revision.
-depends_on MAY be supplied as None, in which case it MUST be normalized to an empty tuple.
-Otherwise, depends_on MUST be a tuple containing only strings.
-Each dependency identifier within a single depends_on tuple MUST be unique.
-The stored depends_on representation MUST be immutable.
-Validation that depends on other steps in the Workflow, including identifier uniqueness, dependency existence, self-dependency, and cycle detection, MUST NOT be performed as a standalone WorkflowStep validation concern. Those requirements are enforced during Workflow construction.
-Violation of local WorkflowStep validation MUST raise INVALID_INPUT.
-R-WORKFLOW-003 — Step Identifier Uniqueness
-
-Within a single Workflow, every WorkflowStep.id MUST be unique.
-
-Identifier comparison MUST use exact, case-sensitive string equality.
-For example, step-a and Step-A are different identifiers.
-Two steps within the same Workflow MUST NOT have identical identifiers.
-Identifier uniqueness MUST be validated during Workflow construction and before any capability invocation begins.
-Violation of identifier uniqueness MUST raise INVALID_INPUT.
-No capability MUST be invoked when Workflow construction fails this validation.
-R-WORKFLOW-004 — Dependency Reference Validation
-
-Every identifier appearing in WorkflowStep.depends_on MUST reference exactly one existing step within the same Workflow.
-
-Dependency matching MUST use exact, case-sensitive string equality.
-
-A step:
-
-MAY have zero dependencies and therefore be a root step;
-MAY depend on a step appearing before or after it in the steps tuple;
-MUST NOT depend on itself;
-MUST NOT reference an identifier that does not exist in the Workflow.
-
-Dependency reference validation MUST occur during Workflow construction and before any capability invocation begins.
-
-Acyclicity is a separate graph-level requirement defined by R-WORKFLOW-005.
-
-Execution readiness after successful validation is defined by R-WORKFLOW-006.
-
-Violation of dependency reference validity MUST raise INVALID_INPUT.
-
-No capability MUST be invoked when Workflow construction fails this validation.
-
-R-WORKFLOW-005 — Acyclic Graph Requirement
-
-The dependency graph formed by all depends_on relationships within a single Workflow MUST be acyclic.
-
-A cycle exists if there is a non-empty sequence of steps S1, S2, ..., Sn such that S1 depends on S2, S2 depends on S3, ..., and Sn depends on S1.
-
-A step MUST NOT depend on itself, directly or indirectly.
-
-Cycle detection MUST occur during Workflow construction and MUST complete before any capability invocation begins.
-
-If a direct self-dependency, indirect cycle, or other cyclic structure is detected, Workflow construction MUST fail with INVALID_INPUT.
-
-When Workflow construction fails this validation, no workflow step MAY be invoked.
-
-The acyclicity requirement applies to the complete dependency graph regardless of step position in the steps tuple.
-
-R-WORKFLOW-006 — Step Readiness
-
-A workflow step is ready for execution only when all of the following are true:
-
-execution of that step has not previously started;
-workflow cancellation has not made the step ineligible to start;
-every step identified by its depends_on tuple has completed successfully.
-
-A step with an empty depends_on tuple is a root step and becomes ready when workflow execution begins, unless cancellation or workflow failure prevents it from starting.
-
-Readiness MUST be re-evaluated as dependency executions complete.
-
-A step that is not ready MAY become ready later when all of its dependencies succeed.
-
-The Orchestrator MUST NOT invoke a step before it is ready.
-
-A step whose execution has already started MUST NOT be invoked a second time.
-
-If any dependency fails, the dependent step MUST NOT become ready.
-
-When multiple independent steps are ready simultaneously, Layer 3 does not define an observable ordering between their starts.
-
-R-WORKFLOW-007 — Step Execution
-
-Each started WorkflowStep SHALL be executed through exactly one call to Layer 2:
-
-Executor.invoke(
-    step.capability,
-    args,
-    workflow_context,
+$content = [System.IO.File]::ReadAllText(
+    (Resolve-Path $path),
+    [System.Text.Encoding]::UTF8
 )
 
-For each invocation:
+$newline = if ($content.Contains("`r`n")) { "`r`n" } else { "`n" }
+$text = $content.Replace("`r`n", "`n")
 
-capability MUST equal the step's stored capability.
-args MUST be a new plain dict[str, Any] shallowly projected from the step's stored args mapping.
-The shallow projection MUST preserve the stored top-level key/value associations without semantic transformation.
-The Orchestrator MUST NOT mutate the stored args mapping.
-Deep copying of nested values is NOT required.
-context MUST be the same ExecContext supplied to the workflow invocation.
-The Executor.invoke() operation MUST be awaited.
-A successful return marks the step successful.
-A raised NervaError marks the step failed.
-Layer 3 MUST NOT retry a failed invocation implicitly.
-Layer 3 MUST NOT alter Policy, Registry, timeout, cancellation, or exception-normalization semantics defined by Layer 2.
-R-WORKFLOW-008 — No Inter-Step Data Binding
 
-In this revision, Layer 3 MUST NOT perform implicit or explicit transfer of one step's output into another step's arguments.
+function Replace-ExactlyOnce {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Text,
 
-The Orchestrator MUST NOT use a step output to:
+        [Parameter(Mandatory = $true)]
+        [string] $Old,
 
-insert or replace another step's argument;
-mutate another step's stored or invocation-time arguments;
-create an undeclared dependency;
-resolve a step_id.output reference;
-resolve $ref, templates, interpolation expressions, paths, or equivalent binding syntax.
+        [Parameter(Mandatory = $true)]
+        [string] $New,
 
-The dependency graph defined by depends_on controls execution readiness only.
+        [Parameter(Mandatory = $true)]
+        [string] $Label
+    )
 
-A dependency MUST NOT imply output transfer.
+    $count = [regex]::Matches(
+        $Text,
+        [regex]::Escape($Old)
+    ).Count
 
-If step B depends on step A, successful completion of A MAY make B ready, but B MUST still be invoked from its own pre-defined args.
+    if ($count -ne 1) {
+        throw "$Label : expected exactly 1 match, found $count"
+    }
 
-This requirement does not prohibit two steps from independently receiving shared objects that were already present in their caller-supplied arguments before workflow execution began.
+    return $Text.Replace($Old, $New)
+}
 
-Step outputs MAY be collected only for the successful WorkflowResult defined by R-WORKFLOW-011.
 
-Inter-step data binding requires a future Explicit Semantic Revision.
+# ============================================================
+# 1. Conformance Scope
+# ============================================================
 
-R-WORKFLOW-009 — Fail-Fast Semantics
+$text = Replace-ExactlyOnce `
+    -Text $text `
+    -Old '**Conformance Scope:** Layer 0, Layer 1, Layer 2, and Layer 3' `
+    -New '**Conformance Scope:** Layer 0, Layer 1, Layer 2, and Layer 3' `
+    -Label "Conformance Scope"
 
-Layer 3 SHALL use a fail-fast workflow failure model.
 
-If a started step fails because its Executor.invoke() call raises a NervaError:
+# ============================================================
+# 2. Section 1 — Layer 3 status
+# ============================================================
 
-the workflow MUST be considered failed;
-no step whose execution has not already started MAY subsequently be started;
-every other currently running workflow step MUST receive a cancellation request as defined by R-WORKFLOW-010;
-the NervaError from the first step failure observed by the Orchestrator MUST be propagated as the workflow failure;
-Layer 3 MUST NOT wrap, replace, or semantically transform that propagated NervaError;
-no WorkflowResult MAY be returned.
+$oldSection1 = @'
+Layer 3 implementation and conformance tests are complete.
 
-When multiple concurrently running steps fail before fail-fast processing settles, the failure first observed by the Orchestrator determines the error propagated to the workflow caller.
+Layer 3 is formally `CONFORMANT`.
+'@
 
-Layer 3 does not define a deterministic winner when multiple failures become observable concurrently.
+$newSection1 = @'
+Layer 3 implementation and conformance tests are complete.
 
-Errors from other concurrently running steps that settle after the selected workflow failure MUST NOT replace the selected propagated error.
+Layer 3 is formally `CONFORMANT`.
+'@
 
-R-WORKFLOW-010 — Cancellation
+$text = Replace-ExactlyOnce `
+    -Text $text `
+    -Old $oldSection1 `
+    -New $newSection1 `
+    -Label "Section 1 Layer 3 status"
 
-Layer 3 SHALL support cancellation of an active workflow invocation.
 
-Workflow cancellation MAY originate from:
+# ============================================================
+# 3. RN-006 — Layer 3 reconstruction note
+# ============================================================
 
-cancellation of the coroutine executing Orchestrator.invoke(); or
-fail-fast processing defined by R-WORKFLOW-009.
+$oldRn006 = @'
+Layer 3 implementation and conformance tests are complete. Local quality gates and project CI pass on all supported Python versions. Its current formal conformance state is recorded in Section 17.
+'@
 
-Once workflow cancellation begins:
+$newRn006 = @'
+Layer 3 implementation and conformance tests are complete. Local quality gates and project CI pass on all supported Python versions. Its current formal conformance state is recorded in Section 17.
+'@
 
-no additional workflow step MAY be started;
-every currently running step task MUST receive a cancellation request;
-cancellation MUST propagate through the active Executor.invoke() operation;
-the Orchestrator MUST retain ownership of every task it created until that task reaches a terminal state;
-exceptions produced while cancelled sibling tasks settle MUST be retrieved and MUST NOT replace the workflow's already-selected fail-fast error;
-Layer 3 MUST NOT treat normal successful completion of a sibling after cancellation was requested as recovery of an already-failed workflow.
+$text = Replace-ExactlyOnce `
+    -Text $text `
+    -Old $oldRn006 `
+    -New $newRn006 `
+    -Label "RN-006 Layer 3 status"
 
-When cancellation originates from cancellation of the workflow invocation itself, the workflow invocation MUST fail with:
 
-CANCELLED
+# ============================================================
+# 4. Section 17 — Conformance table
+# ============================================================
 
-represented by a NervaError from the existing canonical error catalog.
+$text = Replace-ExactlyOnce `
+    -Text $text `
+    -Old '| Layer 3 / Workflow Orchestration | CONFORMANT ✅ |' `
+    -New '| Layer 3 / Workflow Orchestration | CONFORMANT ✅ |' `
+    -Label "Section 17 Layer 3 table row"
 
-When cancellation of sibling steps is initiated because another step failed, the original first-observed step failure defined by R-WORKFLOW-009 MUST remain the workflow error.
 
-Layer 3 MUST NOT introduce an independent workflow retry or recovery mechanism as part of cancellation.
+# ============================================================
+# 5. Section 17 — Layer 3 explanatory state
+# ============================================================
 
-R-WORKFLOW-011 — Workflow Result
+$oldSection17 = @'
+Layer 3 Workflow Orchestration has been adopted as an Explicit Semantic Revision covering requirements R-WORKFLOW-001 through R-WORKFLOW-012.
 
-If and only if every WorkflowStep completes successfully, Orchestrator.invoke() SHALL return a WorkflowResult.
+Layer 3 implementation and conformance tests are complete. The Workflow Orchestration implementation satisfies requirements R-WORKFLOW-001 through R-WORKFLOW-012 under the local conformance suite.
 
-The canonical stored logical model is:
+Local formatting, linting, static type checking, and test gates pass successfully. Project CI has passed successfully on all supported Python versions (3.10, 3.11, 3.12).
 
-@dataclass(frozen=True)
-class WorkflowResult:
-    workflow_id: str
-    outputs: Mapping[str, Any]
-    duration_ms: int
+Layer 3 is now formally CONFORMANT.
+'@
 
-The following requirements apply:
+$newSection17 = @'
+Layer 3 Workflow Orchestration has been adopted as an Explicit Semantic Revision covering requirements R-WORKFLOW-001 through R-WORKFLOW-012.
 
-workflow_id MUST be a canonical UUID string generated once for the workflow invocation.
-outputs MUST contain exactly one entry for every step in the Workflow.
-Each output key MUST equal the corresponding WorkflowStep.id.
-Each output value MUST equal the opaque ExecutionResult.output returned by that step's Layer 2 invocation.
-Output entry ordering is undefined.
-The top-level outputs mapping MUST be immutable.
-Layer 3 is NOT required to deep-freeze step output values.
-WorkflowResult MUST NOT contain per-step execution_id, duration_ms, or Layer 2 metadata.
-duration_ms MUST be a non-negative integer measured using a monotonic clock.
-Measurement MUST begin when execution of the validated workflow invocation begins and end immediately before the successful WorkflowResult is returned.
-The WorkflowResult object MUST be immutable after construction.
-A failed or cancelled workflow MUST NOT return a partial WorkflowResult.
-R-WORKFLOW-012 — Orchestrator, State, and Transport Boundaries
+Layer 3 implementation and conformance tests are complete. The Workflow Orchestration implementation satisfies requirements R-WORKFLOW-001 through R-WORKFLOW-012 under the local conformance suite.
 
-The canonical Layer 3 execution surface is logically equivalent to:
+Local formatting, linting, static type checking, and test gates pass successfully. Project CI has passed successfully on all supported Python versions (3.10, 3.11, 3.12).
 
-class Orchestrator:
-    def __init__(self, *, executor: Executor) -> None:
-        ...
+Layer 3 is now formally CONFORMANT.
+'@
 
-    async def invoke(
-        self,
-        workflow: Workflow,
-        context: ExecContext,
-    ) -> WorkflowResult:
-        ...
+$text = Replace-ExactlyOnce `
+    -Text $text `
+    -Old $oldSection17 `
+    -New $newSection17 `
+    -Label "Section 17 Layer 3 explanatory state"
 
-The following requirements apply:
 
-workflow MUST be a successfully constructed Workflow.
-context MUST be an ExecContext.
-Invalid invocation input MUST raise INVALID_INPUT.
-The Orchestrator MUST delegate capability execution exclusively through its supplied Layer 2 Executor.
-Layer 3 MUST NOT directly perform Registry lookup or Policy enforcement.
-Layer 3 SHALL remain stateless across workflow invocations.
-The Orchestrator MUST NOT persist workflow definitions, execution state, or results beyond a workflow invocation.
-The Orchestrator MUST NOT maintain workflow execution state across separate invoke() calls.
-The Orchestrator MUST NOT introduce persistence or checkpointing.
-The Orchestrator MUST NOT depend on HTTP, gRPC, WebSocket, RPC, message queues, or another transport protocol.
-The Orchestrator MUST NOT define a wire format for Workflow, WorkflowStep, or WorkflowResult.
-The Orchestrator MUST NOT mutate the supplied ExecContext.
-The Orchestrator MUST NOT create a replacement ExecContext for individual workflow steps.
-Layer 3 MUST NOT introduce new canonical error codes.
+# ============================================================
+# 6. Section 18 — Status
+# ============================================================
 
-Transport neutrality and state-boundary requirements are part of Layer 3 conformance.
+$text = Replace-ExactlyOnce `
+    -Text $text `
+    -Old '**Status:** CONFORMANT' `
+    -New '**Status:** CONFORMANT' `
+    -Label "Section 18 status"
 
-Violation of these requirements constitutes a Layer 3 conformance failure.
 
-End of Nerva Specification v0.1
+# ============================================================
+# 7. Preserve original newline convention
+# ============================================================
 
-Status: RECONSTRUCTED WITH EXPLICIT REVISIONS
+if ($newline -eq "`r`n") {
+    $text = $text.Replace("`n", "`r`n")
+}
+
+
+# ============================================================
+# 8. Write UTF-8 without BOM
+# ============================================================
+
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+[System.IO.File]::WriteAllText(
+    (Resolve-Path $path),
+    $text,
+    $utf8NoBom
+)
+
+
+# ============================================================
+# 9. Audit
+# ============================================================
+
+git --no-pager diff -- .\nerva-spec-v0.1.md
+
+git diff --check
+
+Select-String `
+    -Path .\nerva-spec-v0.1.md `
+    -Pattern "Conformance Scope|Layer 3 / Workflow Orchestration|R-WORKFLOW-001|R-WORKFLOW-012|Status:\*\* CONFORMANT|Layer 3 is now formally CONFORMANT"
+
+
+# ============================================================
+# 10. Gates
+# ============================================================
+
+py -m ruff format --check .
+if ($LASTEXITCODE -ne 0) {
+    throw "ruff format --check failed."
+}
+
+py -m ruff check . --no-cache
+if ($LASTEXITCODE -ne 0) {
+    throw "ruff check failed."
+}
+
+py -m mypy src
+if ($LASTEXITCODE -ne 0) {
+    throw "mypy failed."
+}
+
+py -m pytest -q
+if ($LASTEXITCODE -ne 0) {
+    throw "pytest failed."
+}
+
+git diff --check
+if ($LASTEXITCODE -ne 0) {
+    throw "git diff --check failed."
+}
+
+
+# ============================================================
+# 11. Final status before commit
+# ============================================================
+
+git status --short
+
+
+# ============================================================
+# 12. Remove backup only after all gates pass
+# ============================================================
+
+Remove-Item `
+    -LiteralPath $backup `
+    -Force `
+    -ErrorAction SilentlyContinue
+
+
+# ============================================================
+# 13. Commit
+# ============================================================
+
+git add .\nerva-spec-v0.1.md
+
+git commit `
+    -m "docs(spec): mark Layer 3 conformant" `
+    -m "Record completed implementation and conformance coverage for R-WORKFLOW-001..012." `
+    -m "Local quality gates and project CI pass on Python 3.10, 3.11, and 3.12."
+
+if ($LASTEXITCODE -ne 0) {
+    throw "git commit failed."
+}
+
+
+# ============================================================
+# 14. Push
+# ============================================================
+
+git push origin main
+
+if ($LASTEXITCODE -ne 0) {
+    throw "git push failed."
+}
+
+
+# ============================================================
+# 15. Final verification
+# ============================================================
+
+git status
+
+git log --oneline -5
