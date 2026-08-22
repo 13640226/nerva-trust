@@ -1073,7 +1073,7 @@ Implementation and conformance tests for Layer 2 are pending and will follow the
 
 ## 15. Layer 2 — Capability Invocation & Execution
 
-**Status:** SPEC FROZEN / LOCAL CONFORMANCE PASS / CI PENDING
+**Status:** CONFORMANT
 **Revision Type:** EXPLICIT SEMANTIC REVISION  
 **Depends On:** Layer 0 (ExecContext, NervaError), Layer 1 (Registry, Policy)
 
@@ -1362,13 +1362,13 @@ At the time this reconstruction was finalized:
 | Layer 1 / Registry | CONFORMANT ✅ |
 | Layer 1 / Policy | CONFORMANT ✅ |
 | Layer 1 | CONFORMANT ✅ |
-| Layer 2 / Capability Invocation & Execution | SPEC FROZEN / LOCAL CONFORMANCE PASS / CI PENDING ⏳ |
+| Layer 2 / Capability Invocation & Execution | CONFORMANT ⏳ |
 
 The repository's current Layer 0 and Layer 1 implementations have passed their applicable local quality gates and project CI.
 
 Layer 2 Specification has been adopted via Explicit Semantic Revision.
 
-Layer 2 conformance tests and implementation are complete. The Capability Invocation & Execution implementation satisfies requirements R-EXEC-001 through R-EXEC-012 under the local conformance suite. Formal CONFORMANT status remains pending successful CI.
+Layer 2 conformance tests and implementation are complete. The Capability Invocation & Execution implementation satisfies requirements R-EXEC-001 through R-EXEC-012 under the local conformance suite. Project CI has passed successfully on all supported Python versions (3.10, 3.11, 3.12). Layer 2 is now formally CONFORMANT.
 
 ---
 
